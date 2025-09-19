@@ -1,0 +1,8 @@
+
+Vagrant.configure("2") do |config|
+
+  config.vmconfig.vm.box = "bento/ubuntu-22.04"
+  config.vm.box_version = "20191107.0.0"
+  config.vm.hostname = "Adam"
+  config.vm.network "private_network", ip:"172.16.1.1"
+end

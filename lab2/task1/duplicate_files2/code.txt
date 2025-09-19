@@ -1,0 +1,4 @@
+find . -type f -exec md5sum {} + > hashes.txt
+sort hashes.txt > sorted_hashes.txt
+awk 'seen[$1]++ {print$2}' sorted_hashes.txt>duplicate.txt
+xargs -r rm -- < duplicate.txt

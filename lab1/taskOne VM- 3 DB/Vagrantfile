@@ -1,0 +1,28 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.hostname = "dbserver1"
+  config.vm.network "private_network", ip: "172.16.1.10"
+
+  config.vm.provision "shell", inline: <<-SHELL
+    sudo apt-get update -y
+    sudo apt-get install -y python3 python3-pip apt-transport-https ca-certificates curl software-properties-common
+
+    curl -fsSL https://get.docker.com | sh
+    sudo usermod -aG docker vagrant
+
+    docker run -d --name db1 -e POSTGRES_PASSWORD=adminpass -p 5433:5432 postgres:15
+    docker run -d --name db2 -e POSTGRES_PASSWORD=adminpass -p 5434:5432 postgres:15
+    docker run -d --name db3 -e POSTGRES_PASSWORD=adminpass -p 5435:5432 postgres:15
+
+    sleep 10
+
+    docker exec -u postgres db1 psql -c "CREATE USER ror WITH PASSWORD 'paror';"
+    docker exec -u postgres db1 psql -c "CREATE DATABASE db1;"
+    docker exec -u postgres db2 psql -c "CREATE DATABASE db2;"
+    docker exec -u postgres db3 psql -c "CREATE DATABASE db3;"
+    docker exec -u postgres db1 psql -d db1 -c "CREATE TABLE public.student_subject (id SERIAL PRIMARY KEY, subject_name TEXT);"
+    docker exec -u postgres db2 psql -d db2 -c "CREATE TABLE public.student_subject (id SERIAL PRIMARY KEY, subject_name TEXT);"
+    docker exec -u postgres db3 psql -d db3 -c "CREATE TABLE public.student_subject (id SERIAL PRIMARY KEY, subject_name TEXT);"
+  SHELL
+end
+
