@@ -1,0 +1,27 @@
+version: '3.9'
+
+services:
+ postgress:
+  image: postgres:17-alpine3.20
+  container_name: devops-postgress
+  environment:
+   POSTGRES_USER: kbtu_admin
+   POSTGRES_PW: pass
+   POSTGRES_DB: devops_sila
+  ports:
+   - "5434:5432"
+  volumes:
+   - pg_data:/var/lib/postgresql/data
+  networks:
+   devops_net
+  healthcheck:
+   test: ["CMD-SHELL", "pg_isready -U kbtu_admin -d devops-sila"]
+   interval: 10s
+   timeout: 5s
+   retries: 3
+volumes:
+ pg_data
+networks:
+ devops_net:
+  driver: bridge
+
