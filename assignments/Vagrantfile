@@ -1,0 +1,27 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/ubuntu-22.04"
+  config.vm.box_check_update = false
+  config.vm.hostname = "ansible-lab"
+  config.vm.network "private_network", ip: "192.168.56.10"
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"
+    vb.cpus = 2
+  end
+  config.vm.provision "shell", inline: <<-SHELL
+    apt-get update
+    apt-get install -y python3 python3-pip sshpass curl wget unzip tar jq apt-transport-https ca-certificates software-properties-common gnupg git make vim nano htop net-tools dnsutils lsof nmap iproute2 traceroute zip gzip bzip2 
+  SHELL
+  config.vm.provision "file", source: "./user_manager.yml", destination: "/home/vagrant/user_manager.yml"
+  config.vm.provision "file", source: "./nomad_install.yml", destination: "/home/vagrant/nomad_install.yml"
+  config.vm.provision "shell", inline: <<-SHELL
+    echo "[all]" > /home/vagrant/inventory.ini
+    echo "192.168.56.10 ansible_user=vagrant ansible_ssh_pass=vagrant ansible_become_pass=vagrant" >> /home/vagrant/inventory.ini
+    echo "[defaults]" > /home/vagrant/ansible.cfg
+    echo "host_key_checking = False" >> /home/vagrant/ansible.cfg
+    echo "interpreter_python = /usr/bin/python3" >> /home/vagrant/ansible.cfg
+    pip3 install ansible
+    cd /home/vagrant
+    ansible-playbook -i inventory.ini user_manager.yml
+    ansible-playbook -i inventory.ini nomad_install.yml
+  SHELL
+end

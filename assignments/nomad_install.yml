@@ -1,0 +1,112 @@
+---
+- name: Nomad Installation and Configuration
+  hosts: all
+  become: yes
+  
+  tasks:
+    - name: Create nomad user and group
+      ansible.builtin.user:
+        name: nomad
+        system: yes
+        shell: /bin/false
+
+    - name: Create directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: nomad
+        group: nomad
+        mode: '0755'
+      loop:
+        - /etc/nomad.d
+        - /opt/nomad
+
+    - name: Download Nomad binary (correct checksum)
+      ansible.builtin.get_url:
+        url: "https://releases.hashicorp.com/nomad/1.7.0/nomad_1.7.0_linux_amd64.zip"
+        dest: /tmp/nomad.zip
+        checksum: "sha256:2f1b9be41bb1bb3f5e1f81ab247f8b4a2771915fc12316c43f3c8d4e89fa53a9"
+        timeout: 60
+
+    - name: Unzip Nomad binary
+      ansible.builtin.unarchive:
+        src: /tmp/nomad.zip
+        dest: /usr/local/bin/
+        remote_src: yes
+        mode: '0755'
+
+    - name: Create basic Nomad configuration
+      ansible.builtin.copy:
+        dest: /etc/nomad.d/nomad.hcl
+        content: |
+          datacenter = "dc1"
+          data_dir = "/opt/nomad"
+          
+          server {
+            enabled = true
+            bootstrap_expect = 1
+          }
+          
+          client {
+            enabled = true
+          }
+          
+          bind_addr = "0.0.0.0"
+          
+          ports {
+            http = 4646
+            rpc  = 4647
+            serf = 4648
+          }
+        mode: '0644'
+
+    - name: Create systemd service file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/nomad.service
+        content: |
+          [Unit]
+          Description=Nomad
+          Documentation=https://www.nomadproject.io/docs/
+          After=network.target
+          
+          [Service]
+          User=nomad
+          Group=nomad
+          ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
+          ExecReload=/bin/kill -HUP $MAINPID
+          KillSignal=SIGINT
+          Restart=on-failure
+          LimitNOFILE=65536
+          
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Nomad service
+      ansible.builtin.systemd:
+        name: nomad
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Wait for Nomad to start
+      ansible.builtin.wait_for:
+        port: 4646
+        delay: 5
+        timeout: 30
+
+    - name: Check Nomad version
+      ansible.builtin.command: /usr/local/bin/nomad --version
+      register: nomad_version
+
+    - name: Display success message
+      ansible.builtin.debug:
+        msg: |
+          ✅ Nomad installed successfully!
+          Version: {{ nomad_version.stdout }}
+          Web UI: http://192.168.56.10:4646/ui
+          API: http://192.168.56.10:4646/v1

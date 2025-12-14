@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+.git
+.gitlab-ci.yml
+README.md

@@ -1,0 +1,75 @@
+---
+- name: Simple User Manager
+  hosts: all
+  become: yes
+
+  vars:
+    username: "{{ username | default('testuser') }}"
+    action: "{{ action | default('create') }}"
+
+  tasks:
+    - name: Create user
+      ansible.builtin.user:
+        name: "{{ username }}"
+        state: present
+        password: "{{ 'password' | password_hash('sha512') }}"
+        create_home: yes
+        shell: /bin/bash
+        groups: sudo
+      when: action == 'create'
+      register: user_creation
+
+    - name: Create SSH directory
+      ansible.builtin.file:
+        path: "/home/{{ username }}/.ssh"
+        state: directory
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: '0700'
+      when: action == 'create' and user_creation.changed
+
+    - name: Generate SSH key using ssh-keygen
+      ansible.builtin.shell:
+        cmd: "ssh-keygen -t rsa -b 2048 -f /home/{{ username }}/.ssh/id_rsa -N '' -C '{{ username }}@ansible-lab'"
+        creates: "/home/{{ username }}/.ssh/id_rsa"
+      when: action == 'create' and user_creation.changed
+
+    - name: Set correct permissions on SSH key
+      ansible.builtin.file:
+        path: "/home/{{ username }}/.ssh/id_rsa"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: '0600'
+      when: action == 'create'
+
+    - name: Copy public key to authorized_keys
+      ansible.builtin.copy:
+        src: "/home/{{ username }}/.ssh/id_rsa.pub"
+        dest: "/home/{{ username }}/.ssh/authorized_keys"
+        owner: "{{ username }}"
+        group: "{{ username }}"
+        mode: '0600'
+        remote_src: yes
+      when: action == 'create'
+
+    - name: Display SSH key info
+      ansible.builtin.debug:
+        msg: |
+          User {{ username }} created successfully!
+          Password: password
+          SSH Private Key: /home/{{ username }}/.ssh/id_rsa
+          SSH Public Key: /home/{{ username }}/.ssh/id_rsa.pub
+      when: action == 'create' and user_creation.changed
+
+    - name: Delete user
+      ansible.builtin.user:
+        name: "{{ username }}"
+        state: absent
+        remove: yes
+      when: action == 'delete'
+      register: user_deleted
+
+    - name: Show result
+      ansible.builtin.debug:
+        msg: "User {{ username }} has been {{ 'created' if action == 'create' else 'deleted' }}."
+      when: user_creation.changed or user_deleted.changed

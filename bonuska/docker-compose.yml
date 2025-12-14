@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  devops-api:
+    build: .
+    image: odasaku/devops-api:latest
+    container_name: devops-api
+    ports:
+      - "8080:5000"
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - devops-network
+
+networks:
+  devops-network:
+    driver: bridge
